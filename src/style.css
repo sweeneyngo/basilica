@@ -1,0 +1,64 @@
+:root {
+  /* dark "crate-digging" theme */
+  --void: #0a0a0c;
+  --void-2: #121216;
+  --panel-line: #26262e;
+  --smoke: #eae7e0;
+  --smoke-soft: #8b8794;
+  --smoke-faint: #4a4752;
+
+  --marigold: #ffb627; /* the babafy stutter accent */
+  --teal: #35d0b6; /* focus ring */
+
+  --font-display: 'Archivo', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --header-h: 3.75rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: radial-gradient(120% 90% at 50% 0%, var(--void-2) 0%, var(--void) 60%);
+  color: var(--smoke);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+#app {
+  height: 100%;
+}
+
+button {
+  font-family: inherit;
+  color: inherit;
+}
+
+::selection {
+  background: var(--marigold);
+  color: var(--void);
+}
+
+:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

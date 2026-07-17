@@ -134,6 +134,66 @@ function onWheel(e) {
   startEase()
 }
 
+// touch drag + fling — mobile fires no wheel event, so we own touch too and
+// funnel it through the same targetTop/ease cap. finger travel accumulates
+// into targetTop; a light fling projects release velocity forward. because
+// ease() is the ONLY writer of scrollTop, every input shares one speed cap.
+let touchY = null
+let touchVel = 0 // px/ms, smoothed
+let touchT = 0
+function onTouchStart(e) {
+  const box = scroller.value
+  if (!box) return
+  targetTop = box.scrollTop // grab: cancel any residual momentum
+  touchY = e.touches[0].clientY
+  touchT = performance.now()
+  touchVel = 0
+}
+function onTouchMove(e) {
+  const box = scroller.value
+  if (!box || touchY === null) return
+  e.preventDefault()
+  const y = e.touches[0].clientY
+  const now = performance.now()
+  const dy = touchY - y // finger up → scroll down (+)
+  const dt = Math.max(1, now - touchT)
+  touchVel = 0.6 * touchVel + 0.4 * (dy / dt) // EMA of finger velocity
+  touchY = y
+  touchT = now
+  targetTop = clampTop(targetTop + dy)
+  startEase()
+}
+function onTouchEnd() {
+  if (touchY === null) return
+  touchY = null
+  const FLING = 130 // ms of release velocity projected forward
+  const stale = performance.now() - touchT > 80 // finger paused before lift → no fling
+  if (!stale) targetTop = clampTop(targetTop + touchVel * FLING)
+  startEase()
+}
+
+// keyboard: arrows/page step the crate. ITEM_H steps preserve the exact
+// centered offset so a tap lands dead-on the next word; the ease still caps
+// how fast a held key can spin (native arrow-scroll had no cap at all).
+function onKeyDown(e) {
+  const box = scroller.value
+  if (!box) return
+  let delta = 0
+  switch (e.key) {
+    case 'ArrowDown': delta = ITEM_H; break
+    case 'ArrowUp': delta = -ITEM_H; break
+    case 'PageDown': delta = ITEM_H * 5; break
+    case 'PageUp': delta = -ITEM_H * 5; break
+    case 'Home': delta = -box.scrollHeight; break
+    case 'End': delta = box.scrollHeight; break
+    default: return
+  }
+  e.preventDefault()
+  if (easeRaf === null) targetTop = box.scrollTop
+  targetTop = clampTop(targetTop + delta)
+  startEase()
+}
+
 function onScroll() {
   if (ticking) return
   ticking = true
@@ -245,12 +305,20 @@ onMounted(async () => {
   window.addEventListener('mousemove', onMouseMove)
   window.addEventListener('resize', onResize)
   scroller.value.addEventListener('wheel', onWheel, { passive: false })
+  scroller.value.addEventListener('touchstart', onTouchStart, { passive: false })
+  scroller.value.addEventListener('touchmove', onTouchMove, { passive: false })
+  scroller.value.addEventListener('touchend', onTouchEnd)
+  scroller.value.addEventListener('keydown', onKeyDown)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('mousemove', onMouseMove)
   window.removeEventListener('resize', onResize)
   scroller.value?.removeEventListener('wheel', onWheel)
+  scroller.value?.removeEventListener('touchstart', onTouchStart)
+  scroller.value?.removeEventListener('touchmove', onTouchMove)
+  scroller.value?.removeEventListener('touchend', onTouchEnd)
+  scroller.value?.removeEventListener('keydown', onKeyDown)
   if (easeRaf !== null) cancelAnimationFrame(easeRaf)
   clearTimeout(lensIdleTimer)
   clearTimeout(settleTimer)
@@ -349,6 +417,11 @@ onBeforeUnmount(() => {
   /* no CSS scroll-snap: Firefox re-snaps small wheel deltas back to the
      current item, which fights continuous scrolling. we free-scroll and
      center the nearest word in JS after the scroll settles (snapToNearest). */
+  /* native scroll is fully owned in JS (wheel/touch/keys all feed targetTop),
+     so the browser must never scroll this itself — otherwise touch + held
+     arrow keys move uncapped, bypassing the MAX_STEP velocity cap. */
+  touch-action: none;
+  overscroll-behavior: none;
   -ms-overflow-style: none;
   scrollbar-width: none;
   perspective: 720px;
